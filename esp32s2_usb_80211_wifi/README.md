@@ -1,0 +1,1 @@
+just idf.py build
