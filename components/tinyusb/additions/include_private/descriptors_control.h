@@ -51,13 +51,13 @@ enum {
 #   if CFG_TUD_HID
     ITF_NUM_HID,
 #   endif
-
+ ITF_NUM_VENDOR,
     ITF_NUM_TOTAL
 };
 
 enum {
     TUSB_DESC_TOTAL_LEN = TUD_CONFIG_DESC_LEN + CFG_TUD_CDC * TUD_CDC_DESC_LEN + CFG_TUD_MSC * TUD_MSC_DESC_LEN +
-                       CFG_TUD_HID * TUD_HID_DESC_LEN
+                       CFG_TUD_HID * TUD_HID_DESC_LEN+TUD_VENDOR_DESC_LEN
 };
 
 bool tusb_desc_set;

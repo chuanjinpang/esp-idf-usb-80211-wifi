@@ -23,7 +23,8 @@ tusb_desc_device_t descriptor_tinyusb = {
     .bDescriptorType = TUSB_DESC_DEVICE,
     .bcdUSB = 0x0200,
 
-#if CFG_TUD_CDC
+//#if CFG_TUD_CDC
+#if 0
     // Use Interface Association Descriptor (IAD) for CDC
     // As required by USB Specs IAD's subclass must be common class (2) and protocol must be IAD (1)
     .bDeviceClass = TUSB_CLASS_MISC,
