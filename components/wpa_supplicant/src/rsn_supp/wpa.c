@@ -2192,6 +2192,18 @@ int wpa_set_bss(char *macddr, char * bssid, u8 pairwise_cipher, u8 group_cipher,
     return 0;
 }
 
+u8 esp_ext_psk[PMK_LEN];
+u8 esp_ext_psk_flg=0;
+
+int esp_wpa_set_psk_ext(u8 *psk)
+{
+memcpy(esp_ext_psk,psk,PMK_LEN);
+
+	esp_ext_psk_flg=1;
+	wpa_printf(MSG_INFO,"%s set psk",__FUNCTION__);
+	return  0;
+
+}
 /*
  *  Call after set ssid since we calc pmk inside this routine directly
  */
@@ -2207,9 +2219,27 @@ wpa_set_passphrase(char * passphrase, u8 *ssid, size_t ssid_len)
      *  Here only handle passphrase string.  Need extra step to handle 32B, 64Hex raw
      *    PMK.
      */
-    if (sm->key_mgmt == WPA_KEY_MGMT_SAE)
+    if (sm->key_mgmt == WPA_KEY_MGMT_SAE){
         return;
+    	}
+    
+	if(esp_ext_psk_flg){
+    pbkdf2_sha1((char *)esp_wifi_sta_get_prof_password_internal(), sta_ssid->ssid, (size_t)sta_ssid->len,
+	            4096, esp_wifi_sta_get_ap_info_prof_pmk_internal(), PMK_LEN);
 
+
+	wpa_hexdump(MSG_INFO,"esp-psk",esp_wifi_sta_get_ap_info_prof_pmk_internal(), PMK_LEN);
+	wpa_hexdump(MSG_INFO,"my-psk",esp_ext_psk, PMK_LEN);
+
+	memcpy(esp_wifi_sta_get_ap_info_prof_pmk_internal(),esp_ext_psk, PMK_LEN);
+		
+				esp_wifi_sta_update_ap_info_internal();
+				esp_wifi_sta_set_reset_param_internal(0);
+	wpa_printf(MSG_INFO,"%s update ext psk",__FUNCTION__);
+
+
+	}
+	else {	
     /* This is really SLOW, so just re cacl while reset param */
     if (esp_wifi_sta_get_reset_param_internal() != 0) {
         // check it's psk
@@ -2222,7 +2252,7 @@ wpa_set_passphrase(char * passphrase, u8 *ssid, size_t ssid_len)
         esp_wifi_sta_update_ap_info_internal();
         esp_wifi_sta_set_reset_param_internal(0);
     }
-
+	}
     if (sm->key_mgmt == WPA_KEY_MGMT_IEEE8021X) {
     /* TODO nothing */
     } else {
