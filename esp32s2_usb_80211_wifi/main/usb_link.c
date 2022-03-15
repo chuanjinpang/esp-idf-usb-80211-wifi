@@ -322,13 +322,69 @@ static int usblink_encode_urb_msg(uint16_t cmd_flg,uint8_t * urb_msg, const uint
 
 
 
-void usb_error_recovery2(void)
+void usb_error_recovery_reset(void)
 {
 
 	esp_restart();
 		
 
 }
+
+void usb_error_recovery(void)
+{
+
+	uint8_t  epnum=3;
+	int max_cnt=0;
+	usb_in_endpoint_t *in_ep = &(USB0.in_ep_reg[0]);
+
+	// Stop transmitting packets and NAK IN xfers.
+	
+	in_ep[epnum].diepctl |= USB_DI_SNAK1_M;
+	vTaskDelay(10 / portTICK_RATE_MS);
+	while ((in_ep[epnum].diepint & USB_D_INEPNAKEFF0_M) == 0 && max_cnt++<240000); 
+	vTaskDelay(10 / portTICK_RATE_MS);	
+
+	ESP_LOGI(TAG,"usb_error_recovery usb IN[%d] max_cnt%d \n",epnum,max_cnt);
+	{
+	static int err_cnt=0;
+		if(max_cnt> (240000-100))
+			{
+		
+			err_cnt++;
+			ESP_LOGI(TAG,"can't recovery successful,err_cnt:%d %d\n",err_cnt,max_cnt);
+			if(err_cnt>10){
+				ESP_LOGI(TAG,"can't recovery successful, so reset device\n");				
+				usb_error_recovery_reset();
+				}
+			}
+		else {
+
+		err_cnt=0;
+		}
+	}
+
+	
+	vTaskDelay(10 / portTICK_RATE_MS);
+	USB0.in_ep_reg[epnum].dieptsiz = (0 << USB_D_PKTCNT0_S) ; 
+	 uint8_t const fifo_num = ((in_ep[epnum].diepctl >> USB_D_TXFNUM1_S) & USB_D_TXFNUM1_V);
+	 USB0.grstctl |= (fifo_num << USB_TXFNUM_S);
+	 vTaskDelay(10 / portTICK_RATE_MS);
+	 USB0.grstctl |= USB_TXFFLSH_M;
+	 vTaskDelay(10 / portTICK_RATE_MS);
+	 max_cnt=0;
+	 while ((USB0.grstctl & USB_TXFFLSH_M) != 0 && max_cnt++<250) ;
+	 
+	USB0.in_ep_reg[epnum].dieptsiz = (0 << USB_D_PKTCNT0_S) ; 
+	vTaskDelay(10 / portTICK_RATE_MS);
+	USB0.in_ep_reg[epnum].dieptsiz = (1 << USB_D_PKTCNT0_S) ; 
+	vTaskDelay(10 / portTICK_RATE_MS);
+	in_ep[epnum].diepctl |= USB_D_CNAK1;
+
+
+
+
+}
+
 
 
 #define USB_EP_OUT_SIZE 64
@@ -346,13 +402,14 @@ void usblink_process_tx_pkt(urb_msg_t * msg )
 
 		memcpy(msg->payload,urb_msg,urb_len);
 		msg->len=urb_len;
+		vTaskDelay(5 / portTICK_RATE_MS);
 		wt_cnt=tud_vendor_submit_tx_urb(msg);
 	
 
 		//
 		if(0==wt_cnt ){
 			static int err_cnt=0;	
-			usb_error_recovery2();
+			usb_error_recovery();
 						
 			return;
 		} 
